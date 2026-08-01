@@ -8,11 +8,36 @@ import "android.graphics.Color"
 import "android.content.ClipData"
 import "android.content.ClipboardManager"
 import "android.text.InputType"
+import "android.os.Environment"
 
 local aboutModule = require("about")
 local updater = require("updater")
 
-local dataFile = tostring(service.getFilesDir()) .. "/csr_multiproject_data.lua"
+local oldDataFile = tostring(service.getFilesDir()) .. "/csr_multiproject_data.lua"
+local storageDir = Environment.getExternalStorageDirectory().getAbsolutePath() .. "/AndroLua Easy UI Builder"
+local dataFile = storageDir .. "/csr_multiproject_data.lua"
+
+pcall(function()
+  local folder = File(storageDir)
+  if not folder.exists() then
+    folder.mkdirs()
+  end
+  local oldFile = File(oldDataFile)
+  local newFile = File(dataFile)
+  if oldFile.exists() and not newFile.exists() then
+    local fIn = io.open(oldDataFile, "r")
+    if fIn then
+      local data = fIn:read("*a")
+      fIn:close()
+      local fOut = io.open(dataFile, "w")
+      if fOut then
+        fOut:write(data)
+        fOut:close()
+        os.remove(oldDataFile)
+      end
+    end
+  end
+end)
 
 local appData = {
   projects = {},
@@ -2456,7 +2481,6 @@ renderExportCode = function(project)
   dlg.show()
 end
 
--- یہاں اپڈیٹر کو کال کر دیا ہے تاکہ سٹارٹ ہوتے ہی چیک کرے اور مینیو کھول دے
 updater.checkUpdate(function()
   renderMainMenu()
 end)
