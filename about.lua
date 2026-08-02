@@ -142,6 +142,13 @@ M.renderAbout = function(service, historyStack, currentDlg, showToast, renderMai
         },
         {
           TextView,
+          text = "- ComboBoxes (Dropdown Lists): Interactive selection menus allowing users to pick an option from a list. The label text is optional and can be left empty. When entering items, separate each item with a comma followed by a space (for example: Option 1, Option 2, Option 3). Do not put a comma or space after the last item.",
+          textColor = Color.LTGRAY,
+          textSize = "14sp",
+          padding = "5dp",
+        },
+        {
+          TextView,
           text = "- Static TextViews: Informational text blocks to display descriptions, headers, or notes anywhere on your screen.",
           textColor = Color.LTGRAY,
           textSize = "14sp",
