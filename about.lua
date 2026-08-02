@@ -149,6 +149,20 @@ M.renderAbout = function(service, historyStack, currentDlg, showToast, renderMai
         },
         {
           TextView,
+          text = "- Sliders (SeekBar): Interactive range sliders with customizable labels allowing users to adjust numerical values or settings smoothly.",
+          textColor = Color.LTGRAY,
+          textSize = "14sp",
+          padding = "5dp",
+        },
+        {
+          TextView,
+          text = "- Link Buttons: Action buttons configured with external web URLs that launch your default browser to open any link directly when tapped.",
+          textColor = Color.LTGRAY,
+          textSize = "14sp",
+          padding = "5dp",
+        },
+        {
+          TextView,
           text = "How to edit elements: When creating or editing a window, every added element is listed with its index number. Tap any element in the list to open the element editor. From there, you can update its text or hint, change its target navigation ID, move it Up or Down in the layout order instantly with dedicated move buttons, or delete it if it's no longer needed.",
           textColor = Color.LTGRAY,
           textSize = "14sp",
