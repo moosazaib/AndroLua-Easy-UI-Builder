@@ -225,13 +225,10 @@ local generateLuaCode = function(project)
   code = code .. '      end)\n'
   code = code .. '      container.addView(l)\n'
   code = code .. '    elseif elem.type == "edittext" then\n'
-  code = code .. '      if elem.hint and elem.hint ~= "" then\n'
-  code = code .. '        local t = TextView(service)\n'
-  code = code .. '        t.setText(elem.hint)\n'
-  code = code .. '        t.setTextColor(Color.WHITE)\n'
-  code = code .. '        container.addView(t)\n'
-  code = code .. '      end\n'
   code = code .. '      local e = EditText(service)\n'
+  code = code .. '      if elem.hint and elem.hint ~= "" then\n'
+  code = code .. '        e.setHint(elem.hint)\n'
+  code = code .. '      end\n'
   code = code .. '      e.setTextColor(Color.WHITE)\n'
   code = code .. '      container.addView(e)\n'
   code = code .. '    elseif elem.type == "checkbox" then\n'
@@ -416,13 +413,10 @@ renderLiveTest = function(project, param)
       end)
       test_container.addView(l)
     elseif elem.type == "edittext" then
-      if elem.hint and elem.hint ~= "" then
-        local t = TextView(service)
-        t.setText(elem.hint)
-        t.setTextColor(Color.WHITE)
-        test_container.addView(t)
-      end
       local e = EditText(service)
+      if elem.hint and elem.hint ~= "" then
+        e.setHint(elem.hint)
+      end
       e.setTextColor(Color.WHITE)
       test_container.addView(e)
     elseif elem.type == "checkbox" then
@@ -1666,7 +1660,7 @@ renderAddEditText = function(project, tempWindow)
         },
         {
           TextView,
-          text = "Input Label / Heading: (Required)",
+          text = "Input Hint: (Optional)",
           textColor = Color.LTGRAY,
         },
         {
@@ -1695,19 +1689,10 @@ renderAddEditText = function(project, tempWindow)
   dlg = LuaDialog(service)
   dlg.View = loadlayout(layout)
 
-  btn_confirm.setEnabled(false)
-  edt_hint.addTextChangedListener({
-    onTextChanged = function(s, start, before, count)
-      local text = tostring(s):match("^%s*(.-)%s*$")
-      btn_confirm.setEnabled(text ~= "")
-    end,
-    beforeTextChanged = function() end,
-    afterTextChanged = function() end
-  })
+  btn_confirm.setEnabled(true)
 
   btn_confirm.setOnClickListener(function()
     local hintText = edt_hint.getText().toString()
-    if hintText == "" then hintText = "Enter value" end
     table.insert(tempWindow.elements, {
       type = "edittext",
       hint = hintText
@@ -2169,7 +2154,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
   local isTitle = (elem.type == "title")
   local valLabel = "Label/Text: (Required)"
   if elem.type == "edittext" then
-    valLabel = "Input Label / Heading: (Required)"
+    valLabel = "Input Hint: (Optional)"
   elseif elem.type == "checkbox" then
     valLabel = "CheckBox Label: (Required)"
   elseif elem.type == "textview" then
@@ -2274,7 +2259,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
     btn_update.setOnClickListener(function()
       if edt_val then
         local valStr = edt_val.getText().toString()
-        if valStr == "" and elem.type ~= "slider" then valStr = "Element" end
+        if valStr == "" and elem.type ~= "slider" and elem.type ~= "edittext" then valStr = "Element" end
         if elem.type == "button" or elem.type == "clickable" then
           elem.label = valStr
           local targetStr = edt_target and edt_target.getText().toString() or ""
@@ -2304,7 +2289,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
 
     local validateEditElem = function()
       local valStr = edt_val and tostring(edt_val.getText()):match("^%s*(.-)%s*$") or ""
-      if elem.type == "slider" then
+      if elem.type == "slider" or elem.type == "edittext" then
         btn_update.setEnabled(true)
       elseif elem.type == "linkbutton" then
         local uStr = edt_url and tostring(edt_url.getText()):match("^%s*(.-)%s*$") or ""
