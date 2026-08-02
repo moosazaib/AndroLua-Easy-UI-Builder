@@ -1,1 +1,1 @@
-stability fixes
+now you can add combo boxes in your extension interfaces
