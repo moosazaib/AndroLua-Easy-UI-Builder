@@ -9,6 +9,8 @@ import "android.content.ClipData"
 import "android.content.ClipboardManager"
 import "android.text.InputType"
 import "android.os.Environment"
+import "android.content.Intent"
+import "android.net.Uri"
 
 local aboutModule = require("about")
 local updater = require("updater")
@@ -112,9 +114,9 @@ end
 
 local generateLuaCode = function(project)
   if not project or #project.windows == 0 then
-    return "-- No windows defined."
+    return ""
   end
-  local code = 'require "import"\nimport "android.widget.*"\nimport "android.view.*"\nimport "android.graphics.Color"\nimport "android.content.DialogInterface"\n\n'
+  local code = 'require "import"\nimport "android.widget.*"\nimport "android.view.*"\nimport "android.graphics.Color"\nimport "android.content.DialogInterface"\nimport "android.content.Intent"\nimport "android.net.Uri"\n\n'
   code = code .. 'local windows = {}\nlocal dlg = nil\nlocal navStack = {}\n\n'
   for _, win in ipairs(project.windows) do
     code = code .. 'windows[' .. tostring(win.id) .. '] = {\n'
@@ -133,6 +135,10 @@ local generateLuaCode = function(project)
         code = code .. '    { type = "checkbox", label = "' .. tostring(elem.label) .. '" },\n'
       elseif elem.type == "textview" then
         code = code .. '    { type = "textview", text = "' .. tostring(elem.text) .. '" },\n'
+      elseif elem.type == "slider" then
+        code = code .. '    { type = "slider", label = "' .. tostring(elem.label or "") .. '" },\n'
+      elseif elem.type == "linkbutton" then
+        code = code .. '    { type = "linkbutton", label = "' .. tostring(elem.label) .. '", url = "' .. tostring(elem.url) .. '" },\n'
       end
     end
     code = code .. '  }\n}\n\n'
@@ -190,9 +196,6 @@ local generateLuaCode = function(project)
   code = code .. '          end\n'
   code = code .. '        elseif elem.targetId and windows[elem.targetId] then\n'
   code = code .. '          showScreen(elem.targetId, false)\n'
-  code = code .. '        else\n'
-  code = code .. '          Toast.makeText(service, "Clicked: " .. elem.label, Toast.LENGTH_SHORT).show()\n'
-  code = code .. '          service.speak("Clicked: " .. elem.label)\n'
   code = code .. '        end\n'
   code = code .. '      end)\n'
   code = code .. '      container.addView(b)\n'
@@ -218,15 +221,17 @@ local generateLuaCode = function(project)
   code = code .. '          end\n'
   code = code .. '        elseif elem.targetId and windows[elem.targetId] then\n'
   code = code .. '          showScreen(elem.targetId, false)\n'
-  code = code .. '        else\n'
-  code = code .. '          Toast.makeText(service, "Clicked: " .. elem.label, Toast.LENGTH_SHORT).show()\n'
-  code = code .. '          service.speak("Clicked: " .. elem.label)\n'
   code = code .. '        end\n'
   code = code .. '      end)\n'
   code = code .. '      container.addView(l)\n'
   code = code .. '    elseif elem.type == "edittext" then\n'
+  code = code .. '      if elem.hint and elem.hint ~= "" then\n'
+  code = code .. '        local t = TextView(service)\n'
+  code = code .. '        t.setText(elem.hint)\n'
+  code = code .. '        t.setTextColor(Color.WHITE)\n'
+  code = code .. '        container.addView(t)\n'
+  code = code .. '      end\n'
   code = code .. '      local e = EditText(service)\n'
-  code = code .. '      e.setHint(elem.hint)\n'
   code = code .. '      e.setTextColor(Color.WHITE)\n'
   code = code .. '      container.addView(e)\n'
   code = code .. '    elseif elem.type == "checkbox" then\n'
@@ -239,6 +244,28 @@ local generateLuaCode = function(project)
   code = code .. '      t.setText(elem.text)\n'
   code = code .. '      t.setTextColor(Color.WHITE)\n'
   code = code .. '      container.addView(t)\n'
+  code = code .. '    elseif elem.type == "slider" then\n'
+  code = code .. '      if elem.label and elem.label ~= "" then\n'
+  code = code .. '        local t = TextView(service)\n'
+  code = code .. '        t.setText(elem.label)\n'
+  code = code .. '        t.setTextColor(Color.WHITE)\n'
+  code = code .. '        container.addView(t)\n'
+  code = code .. '      end\n'
+  code = code .. '      local s = SeekBar(service)\n'
+  code = code .. '      s.setMax(100)\n'
+  code = code .. '      container.addView(s)\n'
+  code = code .. '    elseif elem.type == "linkbutton" then\n'
+  code = code .. '      local b = Button(service)\n'
+  code = code .. '      b.setText(elem.label)\n'
+  code = code .. '      b.setOnClickListener(function()\n'
+  code = code .. '        if dlg then dlg.dismiss() end\n'
+  code = code .. '        pcall(function()\n'
+  code = code .. '          local intent = Intent(Intent.ACTION_VIEW, Uri.parse(elem.url))\n'
+  code = code .. '          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)\n'
+  code = code .. '          service.startActivity(intent)\n'
+  code = code .. '        end)\n'
+  code = code .. '      end)\n'
+  code = code .. '      container.addView(b)\n'
   code = code .. '    end\n'
   code = code .. '  end\n'
   code = code .. '  dlg.setOnKeyListener(DialogInterface.OnKeyListener{\n'
@@ -263,7 +290,7 @@ local generateLuaCode = function(project)
   return code
 end
 
-local renderMainMenu, renderSavedProjectsList, renderProjectDashboard, renderCreateWindow, renderAddButton, renderAddClickable, renderAddEditText, renderAddCheckBox, renderAddTextView, renderAddTitle, renderEditElement, renderManageWindows, renderEditWindow, renderExportCode, renderLiveTest, renderCreateProjectDialog
+local renderMainMenu, renderSavedProjectsList, renderProjectDashboard, renderCreateWindow, renderAddButton, renderAddClickable, renderAddEditText, renderAddCheckBox, renderAddTextView, renderAddTitle, renderAddSlider, renderAddLinkButton, renderEditElement, renderManageWindows, renderEditWindow, renderExportCode, renderLiveTest, renderCreateProjectDialog, renderAddElementMenu
 
 renderLiveTest = function(project, param)
   local activeWin = nil
@@ -389,8 +416,13 @@ renderLiveTest = function(project, param)
       end)
       test_container.addView(l)
     elseif elem.type == "edittext" then
+      if elem.hint and elem.hint ~= "" then
+        local t = TextView(service)
+        t.setText(elem.hint)
+        t.setTextColor(Color.WHITE)
+        test_container.addView(t)
+      end
       local e = EditText(service)
-      e.setHint(elem.hint)
       e.setTextColor(Color.WHITE)
       test_container.addView(e)
     elseif elem.type == "checkbox" then
@@ -403,6 +435,28 @@ renderLiveTest = function(project, param)
       t.setText(elem.text)
       t.setTextColor(Color.WHITE)
       test_container.addView(t)
+    elseif elem.type == "slider" then
+      if elem.label and elem.label ~= "" then
+        local t = TextView(service)
+        t.setText(elem.label)
+        t.setTextColor(Color.WHITE)
+        test_container.addView(t)
+      end
+      local s = SeekBar(service)
+      s.setMax(100)
+      test_container.addView(s)
+    elseif elem.type == "linkbutton" then
+      local b = Button(service)
+      b.setText(elem.label)
+      b.setOnClickListener(function()
+        if dlg then dlg.dismiss() end
+        pcall(function()
+          local intent = Intent(Intent.ACTION_VIEW, Uri.parse(elem.url))
+          intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+          service.startActivity(intent)
+        end)
+      end)
+      test_container.addView(b)
     end
   end
 
@@ -450,13 +504,12 @@ renderCreateProjectDialog = function()
         },
         {
           TextView,
-          text = "Project Name:",
+          text = "Project Name: (Required)",
           textColor = Color.LTGRAY,
         },
         {
           EditText,
           id = "edt_new_proj_name",
-          hint = "Enter project name",
           textColor = Color.WHITE,
           layout_width = "fill",
         },
@@ -483,11 +536,7 @@ renderCreateProjectDialog = function()
   edt_new_proj_name.addTextChangedListener({
     onTextChanged = function(s, start, before, count)
       local text = tostring(s):match("^%s*(.-)%s*$")
-      if text == "" then
-        btn_do_create.setEnabled(false)
-      else
-        btn_do_create.setEnabled(true)
-      end
+      btn_do_create.setEnabled(text ~= "")
     end,
     beforeTextChanged = function() end,
     afterTextChanged = function() end
@@ -805,7 +854,7 @@ renderProjectDashboard = function(project)
         },
         {
           TextView,
-          text = "Project Name:",
+          text = "Project Name: (Required)",
           textColor = Color.LTGRAY,
         },
         {
@@ -864,6 +913,16 @@ renderProjectDashboard = function(project)
   if dlg then dlg.dismiss() end
   dlg = LuaDialog(service)
   dlg.View = loadlayout(layout)
+
+  edt_proj_name.addTextChangedListener({
+    onTextChanged = function(s, start, before, count)
+      local text = tostring(s):match("^%s*(.-)%s*$")
+      btn_save_proj_name.setEnabled(text ~= "")
+    end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
+  btn_save_proj_name.setEnabled(tostring(edt_proj_name.getText()):match("^%s*(.-)%s*$") ~= "")
 
   btn_save_proj_name.setOnClickListener(function()
     local nameStr = edt_proj_name.getText().toString():match("^%s*(.-)%s*$")
@@ -1000,6 +1059,135 @@ renderProjectDashboard = function(project)
   dlg.show()
 end
 
+renderAddElementMenu = function(project, tempWindow)
+  local layout = {
+    LinearLayout,
+    orientation = "vertical",
+    layout_width = "fill",
+    layout_height = "fill",
+    backgroundColor = Color.parseColor("#121212"),
+    padding = "16dp",
+    {
+      ScrollView,
+      layout_width = "fill",
+      layout_height = "0dp",
+      layout_weight = 1,
+      fillViewport = true,
+      {
+        LinearLayout,
+        id = "add_menu_container",
+        orientation = "vertical",
+        layout_width = "fill",
+        layout_height = "wrap",
+        {
+          TextView,
+          text = "Select Element to Add",
+          textSize = "20sp",
+          textColor = Color.WHITE,
+          padding = "10dp",
+        },
+      }
+    },
+    {
+      Button,
+      id = "btn_add_menu_back",
+      text = "Back",
+      layout_width = "fill",
+    }
+  }
+
+  if dlg then dlg.dismiss() end
+  dlg = LuaDialog(service)
+  dlg.View = loadlayout(layout)
+
+  local hasTitle = false
+  for _, elem in ipairs(tempWindow.elements) do
+    if elem.type == "title" then
+      hasTitle = true
+      break
+    end
+  end
+
+  if not hasTitle then
+    local bTitle = Button(service)
+    bTitle.setText("Add Window Title Element")
+    bTitle.setOnClickListener(function()
+      renderAddTitle(project, tempWindow)
+    end)
+    add_menu_container.addView(bTitle)
+  end
+
+  local bBtn = Button(service)
+  bBtn.setText("Add Button")
+  bBtn.setOnClickListener(function()
+    renderAddButton(project, tempWindow)
+  end)
+  add_menu_container.addView(bBtn)
+
+  local bClk = Button(service)
+  bClk.setText("Add Clickable Item")
+  bClk.setOnClickListener(function()
+    renderAddClickable(project, tempWindow)
+  end)
+  add_menu_container.addView(bClk)
+
+  local bEdt = Button(service)
+  bEdt.setText("Add Input Box")
+  bEdt.setOnClickListener(function()
+    renderAddEditText(project, tempWindow)
+  end)
+  add_menu_container.addView(bEdt)
+
+  local bChk = Button(service)
+  bChk.setText("Add CheckBox")
+  bChk.setOnClickListener(function()
+    renderAddCheckBox(project, tempWindow)
+  end)
+  add_menu_container.addView(bChk)
+
+  local bTxt = Button(service)
+  bTxt.setText("Add TextView")
+  bTxt.setOnClickListener(function()
+    renderAddTextView(project, tempWindow)
+  end)
+  add_menu_container.addView(bTxt)
+
+  local bSld = Button(service)
+  bSld.setText("Add Slider")
+  bSld.setOnClickListener(function()
+    renderAddSlider(project, tempWindow)
+  end)
+  add_menu_container.addView(bSld)
+
+  local bLnk = Button(service)
+  bLnk.setText("Add Link Button")
+  bLnk.setOnClickListener(function()
+    renderAddLinkButton(project, tempWindow)
+  end)
+  add_menu_container.addView(bLnk)
+
+  btn_add_menu_back.setOnClickListener(function()
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  dlg.setOnKeyListener(DialogInterface.OnKeyListener{
+    onKey = function(dialog, keyCode, event)
+      if keyCode == KeyEvent.KEYCODE_BACK and event.getAction() == KeyEvent.ACTION_UP then
+        if #historyStack > 0 then
+          local prev = table.remove(historyStack)
+          prev.func()
+          return true
+        end
+      end
+      return false
+    end
+  })
+  dlg.show()
+end
+
 renderCreateWindow = function(project, tempWindow)
   local layout = {
     LinearLayout,
@@ -1029,14 +1217,13 @@ renderCreateWindow = function(project, tempWindow)
         },
         {
           TextView,
-          text = "Window Title:",
+          text = "Window Title: (Required)",
           textColor = Color.LTGRAY,
         },
         {
           EditText,
           id = "edt_title",
           text = tempWindow.title or "",
-          hint = "Enter Window Title",
           textColor = Color.WHITE,
           layout_width = "fill",
         },
@@ -1083,6 +1270,10 @@ renderCreateWindow = function(project, tempWindow)
         eBtn.setText(tostring(index) .. ". [Checkbox] " .. tostring(elem.label))
       elseif elem.type == "textview" then
         eBtn.setText(tostring(index) .. ". [Text] " .. tostring(elem.text))
+      elseif elem.type == "slider" then
+        eBtn.setText(tostring(index) .. ". [Slider] " .. tostring(elem.label or "SeekBar"))
+      elseif elem.type == "linkbutton" then
+        eBtn.setText(tostring(index) .. ". [Link Button] " .. tostring(elem.label) .. " (" .. tostring(elem.url) .. ")")
       end
       eBtn.setOnClickListener(function()
         tempWindow.title = edt_title.getText().toString()
@@ -1093,69 +1284,14 @@ renderCreateWindow = function(project, tempWindow)
     end
   end
 
-  local hasTitle = false
-  for _, elem in ipairs(tempWindow.elements) do
-    if elem.type == "title" then
-      hasTitle = true
-      break
-    end
-  end
-
-  if not hasTitle then
-    local btn_add_title = Button(service)
-    btn_add_title.setText("Add Window Title Element")
-    btn_add_title.setOnClickListener(function()
-      tempWindow.title = edt_title.getText().toString()
-      table.insert(historyStack, {func = function() renderCreateWindow(project, tempWindow) end})
-      renderAddTitle(project, tempWindow)
-    end)
-    create_bottom_layout.addView(btn_add_title)
-  end
-
-  local btn_add_btn = Button(service)
-  btn_add_btn.setText("Add Button")
-  btn_add_btn.setOnClickListener(function()
+  local btn_add_item = Button(service)
+  btn_add_item.setText("Add New Item")
+  btn_add_item.setOnClickListener(function()
     tempWindow.title = edt_title.getText().toString()
     table.insert(historyStack, {func = function() renderCreateWindow(project, tempWindow) end})
-    renderAddButton(project, tempWindow)
+    renderAddElementMenu(project, tempWindow)
   end)
-  create_bottom_layout.addView(btn_add_btn)
-
-  local btn_add_clk = Button(service)
-  btn_add_clk.setText("Add Clickable Item")
-  btn_add_clk.setOnClickListener(function()
-    tempWindow.title = edt_title.getText().toString()
-    table.insert(historyStack, {func = function() renderCreateWindow(project, tempWindow) end})
-    renderAddClickable(project, tempWindow)
-  end)
-  create_bottom_layout.addView(btn_add_clk)
-
-  local btn_add_edt = Button(service)
-  btn_add_edt.setText("Add Input Box")
-  btn_add_edt.setOnClickListener(function()
-    tempWindow.title = edt_title.getText().toString()
-    table.insert(historyStack, {func = function() renderCreateWindow(project, tempWindow) end})
-    renderAddEditText(project, tempWindow)
-  end)
-  create_bottom_layout.addView(btn_add_edt)
-
-  local btn_add_chk = Button(service)
-  btn_add_chk.setText("Add CheckBox")
-  btn_add_chk.setOnClickListener(function()
-    tempWindow.title = edt_title.getText().toString()
-    table.insert(historyStack, {func = function() renderCreateWindow(project, tempWindow) end})
-    renderAddCheckBox(project, tempWindow)
-  end)
-  create_bottom_layout.addView(btn_add_chk)
-
-  local btn_add_txt = Button(service)
-  btn_add_txt.setText("Add TextView")
-  btn_add_txt.setOnClickListener(function()
-    tempWindow.title = edt_title.getText().toString()
-    table.insert(historyStack, {func = function() renderCreateWindow(project, tempWindow) end})
-    renderAddTextView(project, tempWindow)
-  end)
-  create_bottom_layout.addView(btn_add_txt)
+  create_bottom_layout.addView(btn_add_item)
 
   local btn_win_test = Button(service)
   btn_win_test.setText("Test This Window")
@@ -1195,6 +1331,19 @@ renderCreateWindow = function(project, tempWindow)
     end
   end)
   create_bottom_layout.addView(btn_win_back)
+
+  local validateWinTitle = function()
+    local tText = tostring(edt_title.getText()):match("^%s*(.-)%s*$")
+    local isValid = (tText ~= "")
+    btn_win_test.setEnabled(isValid)
+    btn_save_win.setEnabled(isValid)
+  end
+  edt_title.addTextChangedListener({
+    onTextChanged = function() validateWinTitle() end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
+  validateWinTitle()
 
   dlg.setOnKeyListener(DialogInterface.OnKeyListener{
     onKey = function(dialog, keyCode, event)
@@ -1259,13 +1408,12 @@ renderAddButton = function(project, tempWindow)
         },
         {
           TextView,
-          text = "Button Label:",
+          text = "Button Label: (Required)",
           textColor = Color.LTGRAY,
         },
         {
           EditText,
           id = "edt_label",
-          hint = "Click Me",
           textColor = Color.WHITE,
           layout_width = "fill",
         },
@@ -1278,13 +1426,12 @@ renderAddButton = function(project, tempWindow)
         },
         {
           TextView,
-          text = "Target Window ID (Leave empty for simple toast, 0 for Back):",
+          text = "Target Window ID (Optional, 0 for Back):",
           textColor = Color.LTGRAY,
         },
         {
           EditText,
           id = "edt_target",
-          hint = "e.g. 1, 2... or 0",
           textColor = Color.WHITE,
           layout_width = "fill",
         },
@@ -1308,6 +1455,16 @@ renderAddButton = function(project, tempWindow)
   dlg = LuaDialog(service)
   dlg.View = loadlayout(layout)
   edt_target.setInputType(InputType.TYPE_CLASS_NUMBER)
+
+  btn_confirm.setEnabled(false)
+  edt_label.addTextChangedListener({
+    onTextChanged = function(s, start, before, count)
+      local text = tostring(s):match("^%s*(.-)%s*$")
+      btn_confirm.setEnabled(text ~= "")
+    end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
 
   btn_confirm.setOnClickListener(function()
     local text = edt_label.getText().toString()
@@ -1385,13 +1542,12 @@ renderAddClickable = function(project, tempWindow)
         },
         {
           TextView,
-          text = "Display Label:",
+          text = "Display Label: (Required)",
           textColor = Color.LTGRAY,
         },
         {
           EditText,
           id = "edt_label",
-          hint = "Clickable Item",
           textColor = Color.WHITE,
           layout_width = "fill",
         },
@@ -1404,13 +1560,12 @@ renderAddClickable = function(project, tempWindow)
         },
         {
           TextView,
-          text = "Target Window ID (Leave empty for simple toast, 0 for Back):",
+          text = "Target Window ID (Optional, 0 for Back):",
           textColor = Color.LTGRAY,
         },
         {
           EditText,
           id = "edt_target",
-          hint = "e.g. 1, 2... or 0",
           textColor = Color.WHITE,
           layout_width = "fill",
         },
@@ -1434,6 +1589,16 @@ renderAddClickable = function(project, tempWindow)
   dlg = LuaDialog(service)
   dlg.View = loadlayout(layout)
   edt_target.setInputType(InputType.TYPE_CLASS_NUMBER)
+
+  btn_confirm.setEnabled(false)
+  edt_label.addTextChangedListener({
+    onTextChanged = function(s, start, before, count)
+      local text = tostring(s):match("^%s*(.-)%s*$")
+      btn_confirm.setEnabled(text ~= "")
+    end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
 
   btn_confirm.setOnClickListener(function()
     local text = edt_label.getText().toString()
@@ -1501,13 +1666,12 @@ renderAddEditText = function(project, tempWindow)
         },
         {
           TextView,
-          text = "Hint Text:",
+          text = "Input Label / Heading: (Required)",
           textColor = Color.LTGRAY,
         },
         {
           EditText,
           id = "edt_hint",
-          hint = "Enter text...",
           textColor = Color.WHITE,
           layout_width = "fill",
         },
@@ -1530,6 +1694,16 @@ renderAddEditText = function(project, tempWindow)
   if dlg then dlg.dismiss() end
   dlg = LuaDialog(service)
   dlg.View = loadlayout(layout)
+
+  btn_confirm.setEnabled(false)
+  edt_hint.addTextChangedListener({
+    onTextChanged = function(s, start, before, count)
+      local text = tostring(s):match("^%s*(.-)%s*$")
+      btn_confirm.setEnabled(text ~= "")
+    end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
 
   btn_confirm.setOnClickListener(function()
     local hintText = edt_hint.getText().toString()
@@ -1594,13 +1768,12 @@ renderAddCheckBox = function(project, tempWindow)
         },
         {
           TextView,
-          text = "CheckBox Label:",
+          text = "CheckBox Label: (Required)",
           textColor = Color.LTGRAY,
         },
         {
           EditText,
           id = "edt_label",
-          hint = "Accept terms",
           textColor = Color.WHITE,
           layout_width = "fill",
         },
@@ -1623,6 +1796,16 @@ renderAddCheckBox = function(project, tempWindow)
   if dlg then dlg.dismiss() end
   dlg = LuaDialog(service)
   dlg.View = loadlayout(layout)
+
+  btn_confirm.setEnabled(false)
+  edt_label.addTextChangedListener({
+    onTextChanged = function(s, start, before, count)
+      local text = tostring(s):match("^%s*(.-)%s*$")
+      btn_confirm.setEnabled(text ~= "")
+    end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
 
   btn_confirm.setOnClickListener(function()
     local text = edt_label.getText().toString()
@@ -1687,13 +1870,12 @@ renderAddTextView = function(project, tempWindow)
         },
         {
           TextView,
-          text = "Display Text:",
+          text = "Display Text: (Required)",
           textColor = Color.LTGRAY,
         },
         {
           EditText,
           id = "edt_text",
-          hint = "Hello World",
           textColor = Color.WHITE,
           layout_width = "fill",
         },
@@ -1716,6 +1898,16 @@ renderAddTextView = function(project, tempWindow)
   if dlg then dlg.dismiss() end
   dlg = LuaDialog(service)
   dlg.View = loadlayout(layout)
+
+  btn_confirm.setEnabled(false)
+  edt_text.addTextChangedListener({
+    onTextChanged = function(s, start, before, count)
+      local text = tostring(s):match("^%s*(.-)%s*$")
+      btn_confirm.setEnabled(text ~= "")
+    end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
 
   btn_confirm.setOnClickListener(function()
     local text = edt_text.getText().toString()
@@ -1753,6 +1945,220 @@ renderAddTextView = function(project, tempWindow)
   dlg.show()
 end
 
+renderAddSlider = function(project, tempWindow)
+  local layout = {
+    LinearLayout,
+    orientation = "vertical",
+    layout_width = "fill",
+    layout_height = "fill",
+    backgroundColor = Color.parseColor("#121212"),
+    padding = "16dp",
+    {
+      ScrollView,
+      layout_width = "fill",
+      layout_height = "fill",
+      fillViewport = true,
+      {
+        LinearLayout,
+        orientation = "vertical",
+        layout_width = "fill",
+        layout_height = "wrap",
+        {
+          TextView,
+          text = "Add Slider",
+          textSize = "20sp",
+          textColor = Color.WHITE,
+          padding = "10dp",
+        },
+        {
+          TextView,
+          text = "Slider Label (Optional):",
+          textColor = Color.LTGRAY,
+        },
+        {
+          EditText,
+          id = "edt_label",
+          textColor = Color.WHITE,
+          layout_width = "fill",
+        },
+        {
+          Button,
+          id = "btn_confirm",
+          text = "Confirm",
+          layout_width = "fill",
+        },
+        {
+          Button,
+          id = "btn_cancel",
+          text = "Cancel",
+          layout_width = "fill",
+        },
+      }
+    }
+  }
+
+  if dlg then dlg.dismiss() end
+  dlg = LuaDialog(service)
+  dlg.View = loadlayout(layout)
+
+  btn_confirm.setOnClickListener(function()
+    local text = edt_label.getText().toString()
+    table.insert(tempWindow.elements, {
+      type = "slider",
+      label = text
+    })
+    showToast("Slider added!")
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  btn_cancel.setOnClickListener(function()
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  dlg.setOnKeyListener(DialogInterface.OnKeyListener{
+    onKey = function(dialog, keyCode, event)
+      if keyCode == KeyEvent.KEYCODE_BACK and event.getAction() == KeyEvent.ACTION_UP then
+        if #historyStack > 0 then
+          local prev = table.remove(historyStack)
+          prev.func()
+          return true
+        end
+      end
+      return false
+    end
+  })
+  dlg.show()
+end
+
+renderAddLinkButton = function(project, tempWindow)
+  local layout = {
+    LinearLayout,
+    orientation = "vertical",
+    layout_width = "fill",
+    layout_height = "fill",
+    backgroundColor = Color.parseColor("#121212"),
+    padding = "16dp",
+    {
+      ScrollView,
+      layout_width = "fill",
+      layout_height = "fill",
+      fillViewport = true,
+      {
+        LinearLayout,
+        orientation = "vertical",
+        layout_width = "fill",
+        layout_height = "wrap",
+        {
+          TextView,
+          text = "Add Link Button",
+          textSize = "20sp",
+          textColor = Color.WHITE,
+          padding = "10dp",
+        },
+        {
+          TextView,
+          text = "Button Label: (Required)",
+          textColor = Color.LTGRAY,
+        },
+        {
+          EditText,
+          id = "edt_label",
+          textColor = Color.WHITE,
+          layout_width = "fill",
+        },
+        {
+          TextView,
+          text = "URL / Link: (Required)",
+          textColor = Color.LTGRAY,
+        },
+        {
+          EditText,
+          id = "edt_url",
+          textColor = Color.WHITE,
+          layout_width = "fill",
+        },
+        {
+          Button,
+          id = "btn_confirm",
+          text = "Confirm",
+          layout_width = "fill",
+        },
+        {
+          Button,
+          id = "btn_cancel",
+          text = "Cancel",
+          layout_width = "fill",
+        },
+      }
+    }
+  }
+
+  if dlg then dlg.dismiss() end
+  dlg = LuaDialog(service)
+  dlg.View = loadlayout(layout)
+
+  local validateLinkBtn = function()
+    local lText = tostring(edt_label.getText()):match("^%s*(.-)%s*$")
+    local uText = tostring(edt_url.getText()):match("^%s*(.-)%s*$")
+    btn_confirm.setEnabled(lText ~= "" and uText ~= "")
+  end
+  btn_confirm.setEnabled(false)
+  edt_label.addTextChangedListener({
+    onTextChanged = function() validateLinkBtn() end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
+  edt_url.addTextChangedListener({
+    onTextChanged = function() validateLinkBtn() end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
+
+  btn_confirm.setOnClickListener(function()
+    local text = edt_label.getText().toString()
+    if text == "" then text = "Open Link" end
+    local urlText = edt_url.getText().toString()
+    if urlText == "" then urlText = "https://" end
+    table.insert(tempWindow.elements, {
+      type = "linkbutton",
+      label = text,
+      url = urlText
+    })
+    showToast("Link Button added!")
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  btn_cancel.setOnClickListener(function()
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  dlg.setOnKeyListener(DialogInterface.OnKeyListener{
+    onKey = function(dialog, keyCode, event)
+      if keyCode == KeyEvent.KEYCODE_BACK and event.getAction() == KeyEvent.ACTION_UP then
+        if #historyStack > 0 then
+          local prev = table.remove(historyStack)
+          prev.func()
+          return true
+        end
+      end
+      return false
+    end
+  })
+  dlg.show()
+end
+
 renderEditElement = function(project, tempWindow, elemIndex)
   local elem = tempWindow.elements[elemIndex]
   if not elem then
@@ -1761,8 +2167,16 @@ renderEditElement = function(project, tempWindow, elemIndex)
   end
 
   local isTitle = (elem.type == "title")
-  local valLabel = "Label/Text:"
-  if elem.type == "edittext" then valLabel = "Hint Text:" end
+  local valLabel = "Label/Text: (Required)"
+  if elem.type == "edittext" then
+    valLabel = "Input Label / Heading: (Required)"
+  elseif elem.type == "checkbox" then
+    valLabel = "CheckBox Label: (Required)"
+  elseif elem.type == "textview" then
+    valLabel = "Display Text: (Required)"
+  elseif elem.type == "slider" then
+    valLabel = "Slider Label (Optional):"
+  end
 
   local layout = {
     LinearLayout,
@@ -1805,7 +2219,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
     edit_elem_container.addView(tLbl)
 
     edt_val = EditText(service)
-    local initialVal = (elem.type == "button" or elem.type == "clickable") and elem.label or (elem.type == "edittext" and elem.hint or (elem.type == "checkbox" and elem.label or elem.text))
+    local initialVal = (elem.type == "button" or elem.type == "clickable" or elem.type == "checkbox" or elem.type == "slider" or elem.type == "linkbutton") and elem.label or (elem.type == "edittext" and elem.hint or elem.text)
     edt_val.setText(tostring(initialVal or ""))
     edt_val.setTextColor(Color.WHITE)
     edit_elem_container.addView(edt_val)
@@ -1830,50 +2244,96 @@ renderEditElement = function(project, tempWindow, elemIndex)
     edit_elem_container.addView(winListLbl)
 
     local tLabel = TextView(service)
-    tLabel.setText("Target Window ID (Leave empty for simple toast, 0 for Back):")
+    tLabel.setText("Target Window ID (Optional, 0 for Back):")
     tLabel.setTextColor(Color.LTGRAY)
     edit_elem_container.addView(tLabel)
 
     edt_target = EditText(service)
     edt_target.setText(elem.targetId and tostring(elem.targetId) or "")
-    edt_target.setHint("e.g. 1, 2... or 0")
     edt_target.setTextColor(Color.WHITE)
     edt_target.setInputType(InputType.TYPE_CLASS_NUMBER)
     edit_elem_container.addView(edt_target)
   end
 
-  local btn_update = Button(service)
-  btn_update.setText("Update Element")
-  btn_update.setOnClickListener(function()
-    if not isTitle and edt_val then
-      local valStr = edt_val.getText().toString()
-      if valStr == "" then valStr = "Element" end
-      if elem.type == "button" or elem.type == "clickable" then
-        elem.label = valStr
-        local targetStr = edt_target and edt_target.getText().toString() or ""
-        elem.targetId = tonumber(targetStr)
-      elseif elem.type == "edittext" then
-        elem.hint = valStr
-      elseif elem.type == "checkbox" then
-        elem.label = valStr
-      elseif elem.type == "textview" then
-        elem.text = valStr
+  local edt_url = nil
+  if elem.type == "linkbutton" then
+    local uLbl = TextView(service)
+    uLbl.setText("Link / URL: (Required)")
+    uLbl.setTextColor(Color.LTGRAY)
+    edit_elem_container.addView(uLbl)
+
+    edt_url = EditText(service)
+    edt_url.setText(tostring(elem.url or ""))
+    edt_url.setTextColor(Color.WHITE)
+    edit_elem_container.addView(edt_url)
+  end
+
+  if not isTitle then
+    local btn_update = Button(service)
+    btn_update.setText("Update Element")
+    btn_update.setOnClickListener(function()
+      if edt_val then
+        local valStr = edt_val.getText().toString()
+        if valStr == "" and elem.type ~= "slider" then valStr = "Element" end
+        if elem.type == "button" or elem.type == "clickable" then
+          elem.label = valStr
+          local targetStr = edt_target and edt_target.getText().toString() or ""
+          elem.targetId = tonumber(targetStr)
+        elseif elem.type == "edittext" then
+          elem.hint = valStr
+        elseif elem.type == "checkbox" or elem.type == "slider" then
+          elem.label = valStr
+        elseif elem.type == "textview" then
+          elem.text = valStr
+        elseif elem.type == "linkbutton" then
+          elem.label = valStr
+          if edt_url then
+            local uStr = edt_url.getText().toString()
+            if uStr == "" then uStr = "https://" end
+            elem.url = uStr
+          end
+        end
       end
-    elseif isTitle and (elem.type == "button" or elem.type == "clickable") then
-      local targetStr = edt_target and edt_target.getText().toString() or ""
-      elem.targetId = tonumber(targetStr)
+      showToast("Element updated!")
+      if #historyStack > 0 then
+        local prev = table.remove(historyStack)
+        prev.func()
+      end
+    end)
+    edit_elem_container.addView(btn_update)
+
+    local validateEditElem = function()
+      local valStr = edt_val and tostring(edt_val.getText()):match("^%s*(.-)%s*$") or ""
+      if elem.type == "slider" then
+        btn_update.setEnabled(true)
+      elseif elem.type == "linkbutton" then
+        local uStr = edt_url and tostring(edt_url.getText()):match("^%s*(.-)%s*$") or ""
+        btn_update.setEnabled(valStr ~= "" and uStr ~= "")
+      else
+        btn_update.setEnabled(valStr ~= "")
+      end
     end
-    showToast("Element updated!")
-    if #historyStack > 0 then
-      local prev = table.remove(historyStack)
-      prev.func()
+
+    if edt_val then
+      edt_val.addTextChangedListener({
+        onTextChanged = function() validateEditElem() end,
+        beforeTextChanged = function() end,
+        afterTextChanged = function() end
+      })
     end
-  end)
-  edit_elem_container.addView(btn_update)
+    if edt_url then
+      edt_url.addTextChangedListener({
+        onTextChanged = function() validateEditElem() end,
+        beforeTextChanged = function() end,
+        afterTextChanged = function() end
+      })
+    end
+    validateEditElem()
+  end
 
   if elemIndex > 1 then
     local btn_move_up = Button(service)
-    btn_move_up.setText("Move Up ⬆️")
+    btn_move_up.setText("Move Up")
     btn_move_up.setOnClickListener(function()
       local temp = tempWindow.elements[elemIndex]
       tempWindow.elements[elemIndex] = tempWindow.elements[elemIndex - 1]
@@ -1889,7 +2349,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
 
   if elemIndex < #tempWindow.elements then
     local btn_move_down = Button(service)
-    btn_move_down.setText("Move Down ⬇️")
+    btn_move_down.setText("Move Down")
     btn_move_down.setOnClickListener(function()
       local temp = tempWindow.elements[elemIndex]
       tempWindow.elements[elemIndex] = tempWindow.elements[elemIndex + 1]
@@ -2125,7 +2585,7 @@ renderEditWindow = function(project, win)
         },
         {
           TextView,
-          text = "Window Title:",
+          text = "Window Title: (Required)",
           textColor = Color.LTGRAY,
         },
         {
@@ -2178,6 +2638,10 @@ renderEditWindow = function(project, win)
         eBtn.setText(tostring(index) .. ". [Checkbox] " .. tostring(elem.label))
       elseif elem.type == "textview" then
         eBtn.setText(tostring(index) .. ". [Text] " .. tostring(elem.text))
+      elseif elem.type == "slider" then
+        eBtn.setText(tostring(index) .. ". [Slider] " .. tostring(elem.label or "SeekBar"))
+      elseif elem.type == "linkbutton" then
+        eBtn.setText(tostring(index) .. ". [Link Button] " .. tostring(elem.label) .. " (" .. tostring(elem.url) .. ")")
       end
       eBtn.setOnClickListener(function()
         win.title = edt_edit_title.getText().toString()
@@ -2189,75 +2653,15 @@ renderEditWindow = function(project, win)
     end
   end
 
-  local hasTitle = false
-  for _, elem in ipairs(win.elements) do
-    if elem.type == "title" then
-      hasTitle = true
-      break
-    end
-  end
-
-  if not hasTitle then
-    local btn_edit_add_title = Button(service)
-    btn_edit_add_title.setText("Add Window Title Element")
-    btn_edit_add_title.setOnClickListener(function()
-      win.title = edt_edit_title.getText().toString()
-      saveData()
-      table.insert(historyStack, {func = function() renderEditWindow(project, win) end})
-      renderAddTitle(project, win)
-    end)
-    edit_bottom_layout.addView(btn_edit_add_title)
-  end
-
-  local btn_edit_add_btn = Button(service)
-  btn_edit_add_btn.setText("Add Button")
-  btn_edit_add_btn.setOnClickListener(function()
+  local btn_edit_add_item = Button(service)
+  btn_edit_add_item.setText("Add New Item")
+  btn_edit_add_item.setOnClickListener(function()
     win.title = edt_edit_title.getText().toString()
     saveData()
     table.insert(historyStack, {func = function() renderEditWindow(project, win) end})
-    renderAddButton(project, win)
+    renderAddElementMenu(project, win)
   end)
-  edit_bottom_layout.addView(btn_edit_add_btn)
-
-  local btn_edit_add_clk = Button(service)
-  btn_edit_add_clk.setText("Add Clickable Item")
-  btn_edit_add_clk.setOnClickListener(function()
-    win.title = edt_edit_title.getText().toString()
-    saveData()
-    table.insert(historyStack, {func = function() renderEditWindow(project, win) end})
-    renderAddClickable(project, win)
-  end)
-  edit_bottom_layout.addView(btn_edit_add_clk)
-
-  local btn_edit_add_edt = Button(service)
-  btn_edit_add_edt.setText("Add Input Box")
-  btn_edit_add_edt.setOnClickListener(function()
-    win.title = edt_edit_title.getText().toString()
-    saveData()
-    table.insert(historyStack, {func = function() renderEditWindow(project, win) end})
-    renderAddEditText(project, win)
-  end)
-  edit_bottom_layout.addView(btn_edit_add_edt)
-
-  local btn_edit_add_chk = Button(service)
-  btn_edit_add_chk.setText("Add CheckBox")
-  btn_edit_add_chk.setOnClickListener(function()
-    win.title = edt_edit_title.getText().toString()
-    saveData()
-    table.insert(historyStack, {func = function() renderEditWindow(project, win) end})
-    renderAddCheckBox(project, win)
-  end)
-  edit_bottom_layout.addView(btn_edit_add_chk)
-
-  local btn_edit_add_txt = Button(service)
-  btn_edit_add_txt.setText("Add TextView")
-  btn_edit_add_txt.setOnClickListener(function()
-    win.title = edt_edit_title.getText().toString()
-    saveData()
-    table.insert(historyStack, {func = function() renderEditWindow(project, win) end})
-    renderAddTextView(project, win)
-  end)
-  edit_bottom_layout.addView(btn_edit_add_txt)
+  edit_bottom_layout.addView(btn_edit_add_item)
 
   local btn_edit_test = Button(service)
   btn_edit_test.setText("Test This Window")
@@ -2383,6 +2787,19 @@ renderEditWindow = function(project, win)
     end
   end)
   edit_bottom_layout.addView(btn_edit_back)
+
+  local validateEditWinTitle = function()
+    local tText = tostring(edt_edit_title.getText()):match("^%s*(.-)%s*$")
+    local isValid = (tText ~= "")
+    btn_edit_test.setEnabled(isValid)
+    btn_edit_save.setEnabled(isValid)
+  end
+  edt_edit_title.addTextChangedListener({
+    onTextChanged = function() validateEditWinTitle() end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
+  validateEditWinTitle()
 
   dlg.setOnKeyListener(DialogInterface.OnKeyListener{
     onKey = function(dialog, keyCode, event)
