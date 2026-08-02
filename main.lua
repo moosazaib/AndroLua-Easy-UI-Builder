@@ -139,6 +139,8 @@ local generateLuaCode = function(project)
         code = code .. '    { type = "slider", label = "' .. tostring(elem.label or "") .. '" },\n'
       elseif elem.type == "linkbutton" then
         code = code .. '    { type = "linkbutton", label = "' .. tostring(elem.label) .. '", url = "' .. tostring(elem.url) .. '" },\n'
+      elseif elem.type == "combobox" then
+        code = code .. '    { type = "combobox", label = "' .. tostring(elem.label or "") .. '", options = "' .. tostring(elem.options or "") .. '" },\n'
       end
     end
     code = code .. '  }\n}\n\n'
@@ -263,6 +265,24 @@ local generateLuaCode = function(project)
   code = code .. '        end)\n'
   code = code .. '      end)\n'
   code = code .. '      container.addView(b)\n'
+  code = code .. '    elseif elem.type == "combobox" then\n'
+  code = code .. '      if elem.label and elem.label ~= "" then\n'
+  code = code .. '        local t = TextView(service)\n'
+  code = code .. '        t.setText(elem.label)\n'
+  code = code .. '        t.setTextColor(Color.WHITE)\n'
+  code = code .. '        container.addView(t)\n'
+  code = code .. '      end\n'
+  code = code .. '      local s = Spinner(service)\n'
+  code = code .. '      local opts = {}\n'
+  code = code .. '      for opt in string.gmatch(elem.options or "", "[^,]+") do\n'
+  code = code .. '        local trimmed = opt:match("^%s*(.-)%s*$")\n'
+  code = code .. '        if trimmed ~= "" then table.insert(opts, trimmed) end\n'
+  code = code .. '      end\n'
+  code = code .. '      if #opts == 0 then table.insert(opts, "Option 1") end\n'
+  code = code .. '      local adapter = ArrayAdapter(service, android.R.layout.simple_spinner_item, opts)\n'
+  code = code .. '      adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)\n'
+  code = code .. '      s.setAdapter(adapter)\n'
+  code = code .. '      container.addView(s)\n'
   code = code .. '    end\n'
   code = code .. '  end\n'
   code = code .. '  dlg.setOnKeyListener(DialogInterface.OnKeyListener{\n'
@@ -287,7 +307,7 @@ local generateLuaCode = function(project)
   return code
 end
 
-local renderMainMenu, renderSavedProjectsList, renderProjectDashboard, renderCreateWindow, renderAddButton, renderAddClickable, renderAddEditText, renderAddCheckBox, renderAddTextView, renderAddTitle, renderAddSlider, renderAddLinkButton, renderEditElement, renderManageWindows, renderEditWindow, renderExportCode, renderLiveTest, renderCreateProjectDialog, renderAddElementMenu
+local renderMainMenu, renderSavedProjectsList, renderProjectDashboard, renderCreateWindow, renderAddButton, renderAddClickable, renderAddEditText, renderAddCheckBox, renderAddTextView, renderAddTitle, renderAddSlider, renderAddLinkButton, renderAddComboBox, renderEditElement, renderManageWindows, renderEditWindow, renderExportCode, renderLiveTest, renderCreateProjectDialog, renderAddElementMenu
 
 renderLiveTest = function(project, param)
   local activeWin = nil
@@ -451,6 +471,24 @@ renderLiveTest = function(project, param)
         end)
       end)
       test_container.addView(b)
+    elseif elem.type == "combobox" then
+      if elem.label and elem.label ~= "" then
+        local t = TextView(service)
+        t.setText(elem.label)
+        t.setTextColor(Color.WHITE)
+        test_container.addView(t)
+      end
+      local s = Spinner(service)
+      local opts = {}
+      for opt in string.gmatch(elem.options or "", "[^,]+") do
+        local trimmed = opt:match("^%s*(.-)%s*$")
+        if trimmed ~= "" then table.insert(opts, trimmed) end
+      end
+      if #opts == 0 then table.insert(opts, "Option 1") end
+      local adapter = ArrayAdapter(service, android.R.layout.simple_spinner_item, opts)
+      adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+      s.setAdapter(adapter)
+      test_container.addView(s)
     end
   end
 
@@ -1011,7 +1049,8 @@ renderProjectDashboard = function(project)
       end
       saveData()
       showToast("Project Deleted!")
-      table.remove(historyStack)
+      if #historyStack > 0 then table.remove(historyStack) end
+      if #historyStack > 0 then table.remove(historyStack) end
       renderSavedProjectsList()
     end)
 
@@ -1038,14 +1077,25 @@ renderProjectDashboard = function(project)
   end)
 
   btn_back_saved.setOnClickListener(function()
-    renderSavedProjectsList()
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    else
+      renderSavedProjectsList()
+    end
   end)
 
   dlg.setOnKeyListener(DialogInterface.OnKeyListener{
     onKey = function(dialog, keyCode, event)
       if keyCode == KeyEvent.KEYCODE_BACK and event.getAction() == KeyEvent.ACTION_UP then
-        renderSavedProjectsList()
-        return true
+        if #historyStack > 0 then
+          local prev = table.remove(historyStack)
+          prev.func()
+          return true
+        else
+          renderSavedProjectsList()
+          return true
+        end
       end
       return false
     end
@@ -1160,6 +1210,13 @@ renderAddElementMenu = function(project, tempWindow)
   end)
   add_menu_container.addView(bLnk)
 
+  local bCmb = Button(service)
+  bCmb.setText("Add ComboBox")
+  bCmb.setOnClickListener(function()
+    renderAddComboBox(project, tempWindow)
+  end)
+  add_menu_container.addView(bCmb)
+
   btn_add_menu_back.setOnClickListener(function()
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
@@ -1268,6 +1325,8 @@ renderCreateWindow = function(project, tempWindow)
         eBtn.setText(tostring(index) .. ". [Slider] " .. tostring(elem.label or "SeekBar"))
       elseif elem.type == "linkbutton" then
         eBtn.setText(tostring(index) .. ". [Link Button] " .. tostring(elem.label) .. " (" .. tostring(elem.url) .. ")")
+      elseif elem.type == "combobox" then
+        eBtn.setText(tostring(index) .. ". [ComboBox] " .. tostring((elem.label and elem.label ~= "") and elem.label or "ComboBox") .. " (" .. tostring(elem.options or "") .. ")")
       end
       eBtn.setOnClickListener(function()
         tempWindow.title = edt_title.getText().toString()
@@ -2144,6 +2203,121 @@ renderAddLinkButton = function(project, tempWindow)
   dlg.show()
 end
 
+renderAddComboBox = function(project, tempWindow)
+  local layout = {
+    LinearLayout,
+    orientation = "vertical",
+    layout_width = "fill",
+    layout_height = "fill",
+    backgroundColor = Color.parseColor("#121212"),
+    padding = "16dp",
+    {
+      ScrollView,
+      layout_width = "fill",
+      layout_height = "fill",
+      fillViewport = true,
+      {
+        LinearLayout,
+        orientation = "vertical",
+        layout_width = "fill",
+        layout_height = "wrap",
+        {
+          TextView,
+          text = "Add ComboBox",
+          textSize = "20sp",
+          textColor = Color.WHITE,
+          padding = "10dp",
+        },
+        {
+          TextView,
+          text = "ComboBox Label (Optional):",
+          textColor = Color.LTGRAY,
+        },
+        {
+          EditText,
+          id = "edt_label",
+          textColor = Color.WHITE,
+          layout_width = "fill",
+        },
+        {
+          TextView,
+          text = "Options (Comma Separated): (Required)",
+          textColor = Color.LTGRAY,
+        },
+        {
+          EditText,
+          id = "edt_options",
+          hint = "e.g. Option 1, Option 2, Option 3",
+          textColor = Color.WHITE,
+          layout_width = "fill",
+        },
+        {
+          Button,
+          id = "btn_confirm",
+          text = "Confirm",
+          layout_width = "fill",
+        },
+        {
+          Button,
+          id = "btn_cancel",
+          text = "Cancel",
+          layout_width = "fill",
+        },
+      }
+    }
+  }
+
+  if dlg then dlg.dismiss() end
+  dlg = LuaDialog(service)
+  dlg.View = loadlayout(layout)
+
+  btn_confirm.setEnabled(false)
+  edt_options.addTextChangedListener({
+    onTextChanged = function(s, start, before, count)
+      local text = tostring(s):match("^%s*(.-)%s*$")
+      btn_confirm.setEnabled(text ~= "")
+    end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
+
+  btn_confirm.setOnClickListener(function()
+    local labelText = edt_label.getText().toString()
+    local optionsText = edt_options.getText().toString()
+    table.insert(tempWindow.elements, {
+      type = "combobox",
+      label = labelText,
+      options = optionsText
+    })
+    showToast("ComboBox added!")
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  btn_cancel.setOnClickListener(function()
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  dlg.setOnKeyListener(DialogInterface.OnKeyListener{
+    onKey = function(dialog, keyCode, event)
+      if keyCode == KeyEvent.KEYCODE_BACK and event.getAction() == KeyEvent.ACTION_UP then
+        if #historyStack > 0 then
+          local prev = table.remove(historyStack)
+          prev.func()
+          return true
+        end
+      end
+      return false
+    end
+  })
+  dlg.show()
+end
+
 renderEditElement = function(project, tempWindow, elemIndex)
   local elem = tempWindow.elements[elemIndex]
   if not elem then
@@ -2161,6 +2335,8 @@ renderEditElement = function(project, tempWindow, elemIndex)
     valLabel = "Display Text: (Required)"
   elseif elem.type == "slider" then
     valLabel = "Slider Label (Optional):"
+  elseif elem.type == "combobox" then
+    valLabel = "ComboBox Label (Optional):"
   end
 
   local layout = {
@@ -2204,7 +2380,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
     edit_elem_container.addView(tLbl)
 
     edt_val = EditText(service)
-    local initialVal = (elem.type == "button" or elem.type == "clickable" or elem.type == "checkbox" or elem.type == "slider" or elem.type == "linkbutton") and elem.label or (elem.type == "edittext" and elem.hint or elem.text)
+    local initialVal = (elem.type == "button" or elem.type == "clickable" or elem.type == "checkbox" or elem.type == "slider" or elem.type == "linkbutton" or elem.type == "combobox") and elem.label or (elem.type == "edittext" and elem.hint or elem.text)
     edt_val.setText(tostring(initialVal or ""))
     edt_val.setTextColor(Color.WHITE)
     edit_elem_container.addView(edt_val)
@@ -2253,13 +2429,26 @@ renderEditElement = function(project, tempWindow, elemIndex)
     edit_elem_container.addView(edt_url)
   end
 
+  local edt_options = nil
+  if elem.type == "combobox" then
+    local oLbl = TextView(service)
+    oLbl.setText("Options (Comma Separated): (Required)")
+    oLbl.setTextColor(Color.LTGRAY)
+    edit_elem_container.addView(oLbl)
+
+    edt_options = EditText(service)
+    edt_options.setText(tostring(elem.options or ""))
+    edt_options.setTextColor(Color.WHITE)
+    edit_elem_container.addView(edt_options)
+  end
+
   if not isTitle then
     local btn_update = Button(service)
     btn_update.setText("Update Element")
     btn_update.setOnClickListener(function()
       if edt_val then
         local valStr = edt_val.getText().toString()
-        if valStr == "" and elem.type ~= "slider" and elem.type ~= "edittext" then valStr = "Element" end
+        if valStr == "" and elem.type ~= "slider" and elem.type ~= "edittext" and elem.type ~= "combobox" then valStr = "Element" end
         if elem.type == "button" or elem.type == "clickable" then
           elem.label = valStr
           local targetStr = edt_target and edt_target.getText().toString() or ""
@@ -2268,6 +2457,11 @@ renderEditElement = function(project, tempWindow, elemIndex)
           elem.hint = valStr
         elseif elem.type == "checkbox" or elem.type == "slider" then
           elem.label = valStr
+        elseif elem.type == "combobox" then
+          elem.label = valStr
+          if edt_options then
+            elem.options = edt_options.getText().toString()
+          end
         elseif elem.type == "textview" then
           elem.text = valStr
         elseif elem.type == "linkbutton" then
@@ -2291,6 +2485,9 @@ renderEditElement = function(project, tempWindow, elemIndex)
       local valStr = edt_val and tostring(edt_val.getText()):match("^%s*(.-)%s*$") or ""
       if elem.type == "slider" or elem.type == "edittext" then
         btn_update.setEnabled(true)
+      elseif elem.type == "combobox" then
+        local oStr = edt_options and tostring(edt_options.getText()):match("^%s*(.-)%s*$") or ""
+        btn_update.setEnabled(oStr ~= "")
       elseif elem.type == "linkbutton" then
         local uStr = edt_url and tostring(edt_url.getText()):match("^%s*(.-)%s*$") or ""
         btn_update.setEnabled(valStr ~= "" and uStr ~= "")
@@ -2308,6 +2505,13 @@ renderEditElement = function(project, tempWindow, elemIndex)
     end
     if edt_url then
       edt_url.addTextChangedListener({
+        onTextChanged = function() validateEditElem() end,
+        beforeTextChanged = function() end,
+        afterTextChanged = function() end
+      })
+    end
+    if edt_options then
+      edt_options.addTextChangedListener({
         onTextChanged = function() validateEditElem() end,
         beforeTextChanged = function() end,
         afterTextChanged = function() end
@@ -2627,6 +2831,8 @@ renderEditWindow = function(project, win)
         eBtn.setText(tostring(index) .. ". [Slider] " .. tostring(elem.label or "SeekBar"))
       elseif elem.type == "linkbutton" then
         eBtn.setText(tostring(index) .. ". [Link Button] " .. tostring(elem.label) .. " (" .. tostring(elem.url) .. ")")
+      elseif elem.type == "combobox" then
+        eBtn.setText(tostring(index) .. ". [ComboBox] " .. tostring((elem.label and elem.label ~= "") and elem.label or "ComboBox") .. " (" .. tostring(elem.options or "") .. ")")
       end
       eBtn.setOnClickListener(function()
         win.title = edt_edit_title.getText().toString()
