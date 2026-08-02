@@ -1,1 +1,1 @@
-now you can add sliders and link buttons directly to your extension interfaces
+stability fixes
