@@ -141,6 +141,8 @@ local generateLuaCode = function(project)
         code = code .. '    { type = "linkbutton", label = "' .. tostring(elem.label) .. '", url = "' .. tostring(elem.url) .. '" },\n'
       elseif elem.type == "combobox" then
         code = code .. '    { type = "combobox", label = "' .. tostring(elem.label or "") .. '", options = "' .. tostring(elem.options or "") .. '" },\n'
+      elseif elem.type == "togglebutton" then
+        code = code .. '    { type = "togglebutton", options = "' .. tostring(elem.options or "") .. '" },\n'
       end
     end
     code = code .. '  }\n}\n\n'
@@ -283,6 +285,21 @@ local generateLuaCode = function(project)
   code = code .. '      adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)\n'
   code = code .. '      s.setAdapter(adapter)\n'
   code = code .. '      container.addView(s)\n'
+  code = code .. '    elseif elem.type == "togglebutton" then\n'
+  code = code .. '      local b = Button(service)\n'
+  code = code .. '      local opts = {}\n'
+  code = code .. '      for opt in string.gmatch(elem.options or "", "[^,]+") do\n'
+  code = code .. '        local trimmed = opt:match("^%s*(.-)%s*$")\n'
+  code = code .. '        if trimmed ~= "" then table.insert(opts, trimmed) end\n'
+  code = code .. '      end\n'
+  code = code .. '      if #opts == 0 then table.insert(opts, "Option 1") end\n'
+  code = code .. '      local idx = 1\n'
+  code = code .. '      b.setText(opts[idx])\n'
+  code = code .. '      b.setOnClickListener(function()\n'
+  code = code .. '        idx = (idx % #opts) + 1\n'
+  code = code .. '        b.setText(opts[idx])\n'
+  code = code .. '      end)\n'
+  code = code .. '      container.addView(b)\n'
   code = code .. '    end\n'
   code = code .. '  end\n'
   code = code .. '  dlg.setOnKeyListener(DialogInterface.OnKeyListener{\n'
@@ -307,7 +324,7 @@ local generateLuaCode = function(project)
   return code
 end
 
-local renderMainMenu, renderSavedProjectsList, renderProjectDashboard, renderCreateWindow, renderAddButton, renderAddClickable, renderAddEditText, renderAddCheckBox, renderAddTextView, renderAddTitle, renderAddSlider, renderAddLinkButton, renderAddComboBox, renderEditElement, renderManageWindows, renderEditWindow, renderExportCode, renderLiveTest, renderCreateProjectDialog, renderAddElementMenu
+local renderMainMenu, renderSavedProjectsList, renderProjectDashboard, renderCreateWindow, renderAddButton, renderAddClickable, renderAddEditText, renderAddCheckBox, renderAddTextView, renderAddTitle, renderAddSlider, renderAddLinkButton, renderAddComboBox, renderAddToggleButton, renderEditElement, renderManageWindows, renderEditWindow, renderExportCode, renderLiveTest, renderCreateProjectDialog, renderAddElementMenu
 
 renderLiveTest = function(project, param)
   local activeWin = nil
@@ -489,6 +506,21 @@ renderLiveTest = function(project, param)
       adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
       s.setAdapter(adapter)
       test_container.addView(s)
+    elseif elem.type == "togglebutton" then
+      local b = Button(service)
+      local opts = {}
+      for opt in string.gmatch(elem.options or "", "[^,]+") do
+        local trimmed = opt:match("^%s*(.-)%s*$")
+        if trimmed ~= "" then table.insert(opts, trimmed) end
+      end
+      if #opts == 0 then table.insert(opts, "Option 1") end
+      local idx = 1
+      b.setText(opts[idx])
+      b.setOnClickListener(function()
+        idx = (idx % #opts) + 1
+        b.setText(opts[idx])
+      end)
+      test_container.addView(b)
     end
   end
 
@@ -1217,6 +1249,13 @@ renderAddElementMenu = function(project, tempWindow)
   end)
   add_menu_container.addView(bCmb)
 
+  local bTgl = Button(service)
+  bTgl.setText("Add Toggle Button")
+  bTgl.setOnClickListener(function()
+    renderAddToggleButton(project, tempWindow)
+  end)
+  add_menu_container.addView(bTgl)
+
   btn_add_menu_back.setOnClickListener(function()
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
@@ -1327,6 +1366,8 @@ renderCreateWindow = function(project, tempWindow)
         eBtn.setText(tostring(index) .. ". [Link Button] " .. tostring(elem.label) .. " (" .. tostring(elem.url) .. ")")
       elseif elem.type == "combobox" then
         eBtn.setText(tostring(index) .. ". [ComboBox] " .. tostring((elem.label and elem.label ~= "") and elem.label or "ComboBox") .. " (" .. tostring(elem.options or "") .. ")")
+      elseif elem.type == "togglebutton" then
+        eBtn.setText(tostring(index) .. ". [Toggle Button] (" .. tostring(elem.options or "") .. ")")
       end
       eBtn.setOnClickListener(function()
         tempWindow.title = edt_title.getText().toString()
@@ -2318,6 +2359,108 @@ renderAddComboBox = function(project, tempWindow)
   dlg.show()
 end
 
+renderAddToggleButton = function(project, tempWindow)
+  local layout = {
+    LinearLayout,
+    orientation = "vertical",
+    layout_width = "fill",
+    layout_height = "fill",
+    backgroundColor = Color.parseColor("#121212"),
+    padding = "16dp",
+    {
+      ScrollView,
+      layout_width = "fill",
+      layout_height = "fill",
+      fillViewport = true,
+      {
+        LinearLayout,
+        orientation = "vertical",
+        layout_width = "fill",
+        layout_height = "wrap",
+        {
+          TextView,
+          text = "Add Toggle Button",
+          textSize = "20sp",
+          textColor = Color.WHITE,
+          padding = "10dp",
+        },
+        {
+          TextView,
+          text = "Options (Comma Separated): (Required)",
+          textColor = Color.LTGRAY,
+        },
+        {
+          EditText,
+          id = "edt_options",
+          hint = "e.g. Option 1, Option 2, Option 3",
+          textColor = Color.WHITE,
+          layout_width = "fill",
+        },
+        {
+          Button,
+          id = "btn_confirm",
+          text = "Confirm",
+          layout_width = "fill",
+        },
+        {
+          Button,
+          id = "btn_cancel",
+          text = "Cancel",
+          layout_width = "fill",
+        },
+      }
+    }
+  }
+
+  if dlg then dlg.dismiss() end
+  dlg = LuaDialog(service)
+  dlg.View = loadlayout(layout)
+
+  btn_confirm.setEnabled(false)
+  edt_options.addTextChangedListener({
+    onTextChanged = function(s, start, before, count)
+      local text = tostring(s):match("^%s*(.-)%s*$")
+      btn_confirm.setEnabled(text ~= "")
+    end,
+    beforeTextChanged = function() end,
+    afterTextChanged = function() end
+  })
+
+  btn_confirm.setOnClickListener(function()
+    local optionsText = edt_options.getText().toString()
+    table.insert(tempWindow.elements, {
+      type = "togglebutton",
+      options = optionsText
+    })
+    showToast("Toggle Button added!")
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  btn_cancel.setOnClickListener(function()
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  dlg.setOnKeyListener(DialogInterface.OnKeyListener{
+    onKey = function(dialog, keyCode, event)
+      if keyCode == KeyEvent.KEYCODE_BACK and event.getAction() == KeyEvent.ACTION_UP then
+        if #historyStack > 0 then
+          local prev = table.remove(historyStack)
+          prev.func()
+          return true
+        end
+      end
+      return false
+    end
+  })
+  dlg.show()
+end
+
 renderEditElement = function(project, tempWindow, elemIndex)
   local elem = tempWindow.elements[elemIndex]
   if not elem then
@@ -2326,6 +2469,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
   end
 
   local isTitle = (elem.type == "title")
+  local isToggle = (elem.type == "togglebutton")
   local valLabel = "Label/Text: (Required)"
   if elem.type == "edittext" then
     valLabel = "Input Hint: (Optional)"
@@ -2373,7 +2517,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
   dlg.View = loadlayout(layout)
 
   local edt_val = nil
-  if not isTitle then
+  if not isTitle and not isToggle then
     local tLbl = TextView(service)
     tLbl.setText(valLabel)
     tLbl.setTextColor(Color.LTGRAY)
@@ -2430,7 +2574,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
   end
 
   local edt_options = nil
-  if elem.type == "combobox" then
+  if elem.type == "combobox" or elem.type == "togglebutton" then
     local oLbl = TextView(service)
     oLbl.setText("Options (Comma Separated): (Required)")
     oLbl.setTextColor(Color.LTGRAY)
@@ -2472,6 +2616,10 @@ renderEditElement = function(project, tempWindow, elemIndex)
             elem.url = uStr
           end
         end
+      elseif elem.type == "togglebutton" then
+        if edt_options then
+          elem.options = edt_options.getText().toString()
+        end
       end
       showToast("Element updated!")
       if #historyStack > 0 then
@@ -2485,7 +2633,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
       local valStr = edt_val and tostring(edt_val.getText()):match("^%s*(.-)%s*$") or ""
       if elem.type == "slider" or elem.type == "edittext" then
         btn_update.setEnabled(true)
-      elseif elem.type == "combobox" then
+      elseif elem.type == "combobox" or elem.type == "togglebutton" then
         local oStr = edt_options and tostring(edt_options.getText()):match("^%s*(.-)%s*$") or ""
         btn_update.setEnabled(oStr ~= "")
       elseif elem.type == "linkbutton" then
@@ -2833,6 +2981,8 @@ renderEditWindow = function(project, win)
         eBtn.setText(tostring(index) .. ". [Link Button] " .. tostring(elem.label) .. " (" .. tostring(elem.url) .. ")")
       elseif elem.type == "combobox" then
         eBtn.setText(tostring(index) .. ". [ComboBox] " .. tostring((elem.label and elem.label ~= "") and elem.label or "ComboBox") .. " (" .. tostring(elem.options or "") .. ")")
+      elseif elem.type == "togglebutton" then
+        eBtn.setText(tostring(index) .. ". [Toggle Button] (" .. tostring(elem.options or "") .. ")")
       end
       eBtn.setOnClickListener(function()
         win.title = edt_edit_title.getText().toString()
