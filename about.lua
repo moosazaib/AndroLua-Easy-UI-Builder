@@ -149,6 +149,13 @@ M.renderAbout = function(service, historyStack, currentDlg, showToast, renderMai
         },
         {
           TextView,
+          text = "- Toggle Buttons: Interactive toggle options allowing users to switch between states or choices. Just like ComboBoxes, enter the options separated by a comma followed by a space (for example: Option 1, Option 2). Do not put a comma or space after the last item.",
+          textColor = Color.LTGRAY,
+          textSize = "14sp",
+          padding = "5dp",
+        },
+        {
+          TextView,
           text = "- Static TextViews: Informational text blocks to display descriptions, headers, or notes anywhere on your screen.",
           textColor = Color.LTGRAY,
           textSize = "14sp",
