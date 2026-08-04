@@ -1,1 +1,2 @@
-now you can add combo boxes in your extension interfaces
+now you can add toggle button in your extension interface
+Do you want to know how to use this extension? If so, visit the About page from the main menu.
