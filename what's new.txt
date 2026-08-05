@@ -1,2 +1,6 @@
-now you can add toggle button in your extension interface
+Change Element Type On-the-Fly
+
+- Easy Swapping: Made an element by mistake? You no longer need to delete and recreate it.
+- One-Tap Conversion: Simply tap any existing element and choose Change Element Type to switch it instantly to any other component.
+- Faster UI Building: Save time and modify your app layouts without losing your progress.
 Do you want to know how to use this extension? If so, visit the About page from the main menu.
