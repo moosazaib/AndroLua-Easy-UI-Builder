@@ -324,7 +324,7 @@ local generateLuaCode = function(project)
   return code
 end
 
-local renderMainMenu, renderSavedProjectsList, renderProjectDashboard, renderCreateWindow, renderAddButton, renderAddClickable, renderAddEditText, renderAddCheckBox, renderAddTextView, renderAddTitle, renderAddSlider, renderAddLinkButton, renderAddComboBox, renderAddToggleButton, renderEditElement, renderManageWindows, renderEditWindow, renderExportCode, renderLiveTest, renderCreateProjectDialog, renderAddElementMenu
+local renderMainMenu, renderSavedProjectsList, renderProjectDashboard, renderCreateWindow, renderAddButton, renderAddClickable, renderAddEditText, renderAddCheckBox, renderAddTextView, renderAddTitle, renderAddSlider, renderAddLinkButton, renderAddComboBox, renderAddToggleButton, renderEditElement, renderManageWindows, renderEditWindow, renderExportCode, renderLiveTest, renderCreateProjectDialog, renderAddElementMenu, renderChangeElementTypeMenu
 
 renderLiveTest = function(project, param)
   local activeWin = nil
@@ -1278,6 +1278,171 @@ renderAddElementMenu = function(project, tempWindow)
   dlg.show()
 end
 
+renderChangeElementTypeMenu = function(project, tempWindow, elemIndex)
+  local currentElem = tempWindow.elements[elemIndex]
+  if not currentElem then return end
+  local currentType = currentElem.type
+
+  local layout = {
+    LinearLayout,
+    orientation = "vertical",
+    layout_width = "fill",
+    layout_height = "fill",
+    backgroundColor = Color.parseColor("#121212"),
+    padding = "16dp",
+    {
+      ScrollView,
+      layout_width = "fill",
+      layout_height = "0dp",
+      layout_weight = 1,
+      fillViewport = true,
+      {
+        LinearLayout,
+        id = "change_menu_container",
+        orientation = "vertical",
+        layout_width = "fill",
+        layout_height = "wrap",
+        {
+          TextView,
+          text = "Select New Element Type",
+          textSize = "20sp",
+          textColor = Color.WHITE,
+          padding = "10dp",
+        },
+      }
+    },
+    {
+      Button,
+      id = "btn_change_menu_back",
+      text = "Back",
+      layout_width = "fill",
+    }
+  }
+
+  if dlg then dlg.dismiss() end
+  dlg = LuaDialog(service)
+  dlg.View = loadlayout(layout)
+
+  local hasTitle = false
+  for _, elem in ipairs(tempWindow.elements) do
+    if elem.type == "title" then
+      hasTitle = true
+      break
+    end
+  end
+
+  if currentType ~= "title" and not hasTitle then
+    local bTitle = Button(service)
+    bTitle.setText("Add Window Title Element")
+    bTitle.setOnClickListener(function()
+      renderAddTitle(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bTitle)
+  end
+
+  if currentType ~= "button" then
+    local bBtn = Button(service)
+    bBtn.setText("Add Button")
+    bBtn.setOnClickListener(function()
+      renderAddButton(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bBtn)
+  end
+
+  if currentType ~= "clickable" then
+    local bClk = Button(service)
+    bClk.setText("Add Clickable Item")
+    bClk.setOnClickListener(function()
+      renderAddClickable(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bClk)
+  end
+
+  if currentType ~= "edittext" then
+    local bEdt = Button(service)
+    bEdt.setText("Add Input Box")
+    bEdt.setOnClickListener(function()
+      renderAddEditText(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bEdt)
+  end
+
+  if currentType ~= "checkbox" then
+    local bChk = Button(service)
+    bChk.setText("Add CheckBox")
+    bChk.setOnClickListener(function()
+      renderAddCheckBox(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bChk)
+  end
+
+  if currentType ~= "textview" then
+    local bTxt = Button(service)
+    bTxt.setText("Add TextView")
+    bTxt.setOnClickListener(function()
+      renderAddTextView(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bTxt)
+  end
+
+  if currentType ~= "slider" then
+    local bSld = Button(service)
+    bSld.setText("Add Slider")
+    bSld.setOnClickListener(function()
+      renderAddSlider(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bSld)
+  end
+
+  if currentType ~= "linkbutton" then
+    local bLnk = Button(service)
+    bLnk.setText("Add Link Button")
+    bLnk.setOnClickListener(function()
+      renderAddLinkButton(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bLnk)
+  end
+
+  if currentType ~= "combobox" then
+    local bCmb = Button(service)
+    bCmb.setText("Add ComboBox")
+    bCmb.setOnClickListener(function()
+      renderAddComboBox(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bCmb)
+  end
+
+  if currentType ~= "togglebutton" then
+    local bTgl = Button(service)
+    bTgl.setText("Add Toggle Button")
+    bTgl.setOnClickListener(function()
+      renderAddToggleButton(project, tempWindow, elemIndex)
+    end)
+    change_menu_container.addView(bTgl)
+  end
+
+  btn_change_menu_back.setOnClickListener(function()
+    if #historyStack > 0 then
+      local prev = table.remove(historyStack)
+      prev.func()
+    end
+  end)
+
+  dlg.setOnKeyListener(DialogInterface.OnKeyListener{
+    onKey = function(dialog, keyCode, event)
+      if keyCode == KeyEvent.KEYCODE_BACK and event.getAction() == KeyEvent.ACTION_UP then
+        if #historyStack > 0 then
+          local prev = table.remove(historyStack)
+          prev.func()
+          return true
+        end
+      end
+      return false
+    end
+  })
+  dlg.show()
+end
+
 renderCreateWindow = function(project, tempWindow)
   local layout = {
     LinearLayout,
@@ -1454,18 +1619,27 @@ renderCreateWindow = function(project, tempWindow)
   dlg.show()
 end
 
-renderAddTitle = function(project, tempWindow)
-  table.insert(tempWindow.elements, {
+renderAddTitle = function(project, tempWindow, replaceIndex)
+  local newElem = {
     type = "title"
-  })
-  showToast("Window Title element added!")
+  }
+  if replaceIndex then
+    tempWindow.elements[replaceIndex] = newElem
+    showToast("Element type changed!")
+    if #historyStack > 1 then
+      table.remove(historyStack)
+    end
+  else
+    table.insert(tempWindow.elements, newElem)
+    showToast("Window Title element added!")
+  end
   if #historyStack > 0 then
     local prev = table.remove(historyStack)
     prev.func()
   end
 end
 
-renderAddButton = function(project, tempWindow)
+renderAddButton = function(project, tempWindow, replaceIndex)
   local existingList = "Available Windows in Project:\n"
   if #project.windows == 0 then
     existingList = existingList .. "(None yet)\n"
@@ -1565,12 +1739,21 @@ renderAddButton = function(project, tempWindow)
     if text == "" then text = "Button" end
     local targetStr = edt_target.getText().toString()
     local targetIdNum = tonumber(targetStr)
-    table.insert(tempWindow.elements, {
+    local newElem = {
       type = "button",
       label = text,
       targetId = targetIdNum
-    })
-    showToast("Button added!")
+    }
+    if replaceIndex then
+      tempWindow.elements[replaceIndex] = newElem
+      showToast("Element type changed!")
+      if #historyStack > 1 then
+        table.remove(historyStack)
+      end
+    else
+      table.insert(tempWindow.elements, newElem)
+      showToast("Button added!")
+    end
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
       prev.func()
@@ -1599,7 +1782,7 @@ renderAddButton = function(project, tempWindow)
   dlg.show()
 end
 
-renderAddClickable = function(project, tempWindow)
+renderAddClickable = function(project, tempWindow, replaceIndex)
   local existingList = "Available Windows in Project:\n"
   if #project.windows == 0 then
     existingList = existingList .. "(None yet)\n"
@@ -1699,12 +1882,21 @@ renderAddClickable = function(project, tempWindow)
     if text == "" then text = "Clickable" end
     local targetStr = edt_target.getText().toString()
     local targetIdNum = tonumber(targetStr)
-    table.insert(tempWindow.elements, {
+    local newElem = {
       type = "clickable",
       label = text,
       targetId = targetIdNum
-    })
-    showToast("Clickable item added!")
+    }
+    if replaceIndex then
+      tempWindow.elements[replaceIndex] = newElem
+      showToast("Element type changed!")
+      if #historyStack > 1 then
+        table.remove(historyStack)
+      end
+    else
+      table.insert(tempWindow.elements, newElem)
+      showToast("Clickable item added!")
+    end
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
       prev.func()
@@ -1733,7 +1925,7 @@ renderAddClickable = function(project, tempWindow)
   dlg.show()
 end
 
-renderAddEditText = function(project, tempWindow)
+renderAddEditText = function(project, tempWindow, replaceIndex)
   local layout = {
     LinearLayout,
     orientation = "vertical",
@@ -1793,11 +1985,20 @@ renderAddEditText = function(project, tempWindow)
 
   btn_confirm.setOnClickListener(function()
     local hintText = edt_hint.getText().toString()
-    table.insert(tempWindow.elements, {
+    local newElem = {
       type = "edittext",
       hint = hintText
-    })
-    showToast("Input box added!")
+    }
+    if replaceIndex then
+      tempWindow.elements[replaceIndex] = newElem
+      showToast("Element type changed!")
+      if #historyStack > 1 then
+        table.remove(historyStack)
+      end
+    else
+      table.insert(tempWindow.elements, newElem)
+      showToast("Input box added!")
+    end
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
       prev.func()
@@ -1826,7 +2027,7 @@ renderAddEditText = function(project, tempWindow)
   dlg.show()
 end
 
-renderAddCheckBox = function(project, tempWindow)
+renderAddCheckBox = function(project, tempWindow, replaceIndex)
   local layout = {
     LinearLayout,
     orientation = "vertical",
@@ -1853,7 +2054,7 @@ renderAddCheckBox = function(project, tempWindow)
         },
         {
           TextView,
-          text = "CheckBox Label: (Required)",
+          text = "CheckBox Label: (Optional)",
           textColor = Color.LTGRAY,
         },
         {
@@ -1882,24 +2083,24 @@ renderAddCheckBox = function(project, tempWindow)
   dlg = LuaDialog(service)
   dlg.View = loadlayout(layout)
 
-  btn_confirm.setEnabled(false)
-  edt_label.addTextChangedListener({
-    onTextChanged = function(s, start, before, count)
-      local text = tostring(s):match("^%s*(.-)%s*$")
-      btn_confirm.setEnabled(text ~= "")
-    end,
-    beforeTextChanged = function() end,
-    afterTextChanged = function() end
-  })
+  btn_confirm.setEnabled(true)
 
   btn_confirm.setOnClickListener(function()
     local text = edt_label.getText().toString()
-    if text == "" then text = "CheckBox" end
-    table.insert(tempWindow.elements, {
+    local newElem = {
       type = "checkbox",
       label = text
-    })
-    showToast("CheckBox added!")
+    }
+    if replaceIndex then
+      tempWindow.elements[replaceIndex] = newElem
+      showToast("Element type changed!")
+      if #historyStack > 1 then
+        table.remove(historyStack)
+      end
+    else
+      table.insert(tempWindow.elements, newElem)
+      showToast("CheckBox added!")
+    end
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
       prev.func()
@@ -1928,7 +2129,7 @@ renderAddCheckBox = function(project, tempWindow)
   dlg.show()
 end
 
-renderAddTextView = function(project, tempWindow)
+renderAddTextView = function(project, tempWindow, replaceIndex)
   local layout = {
     LinearLayout,
     orientation = "vertical",
@@ -1997,11 +2198,20 @@ renderAddTextView = function(project, tempWindow)
   btn_confirm.setOnClickListener(function()
     local text = edt_text.getText().toString()
     if text == "" then text = "Text" end
-    table.insert(tempWindow.elements, {
+    local newElem = {
       type = "textview",
       text = text
-    })
-    showToast("TextView added!")
+    }
+    if replaceIndex then
+      tempWindow.elements[replaceIndex] = newElem
+      showToast("Element type changed!")
+      if #historyStack > 1 then
+        table.remove(historyStack)
+      end
+    else
+      table.insert(tempWindow.elements, newElem)
+      showToast("TextView added!")
+    end
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
       prev.func()
@@ -2030,7 +2240,7 @@ renderAddTextView = function(project, tempWindow)
   dlg.show()
 end
 
-renderAddSlider = function(project, tempWindow)
+renderAddSlider = function(project, tempWindow, replaceIndex)
   local layout = {
     LinearLayout,
     orientation = "vertical",
@@ -2088,11 +2298,20 @@ renderAddSlider = function(project, tempWindow)
 
   btn_confirm.setOnClickListener(function()
     local text = edt_label.getText().toString()
-    table.insert(tempWindow.elements, {
+    local newElem = {
       type = "slider",
       label = text
-    })
-    showToast("Slider added!")
+    }
+    if replaceIndex then
+      tempWindow.elements[replaceIndex] = newElem
+      showToast("Element type changed!")
+      if #historyStack > 1 then
+        table.remove(historyStack)
+      end
+    else
+      table.insert(tempWindow.elements, newElem)
+      showToast("Slider added!")
+    end
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
       prev.func()
@@ -2121,7 +2340,7 @@ renderAddSlider = function(project, tempWindow)
   dlg.show()
 end
 
-renderAddLinkButton = function(project, tempWindow)
+renderAddLinkButton = function(project, tempWindow, replaceIndex)
   local layout = {
     LinearLayout,
     orientation = "vertical",
@@ -2210,12 +2429,21 @@ renderAddLinkButton = function(project, tempWindow)
     if text == "" then text = "Open Link" end
     local urlText = edt_url.getText().toString()
     if urlText == "" then urlText = "https://" end
-    table.insert(tempWindow.elements, {
+    local newElem = {
       type = "linkbutton",
       label = text,
       url = urlText
-    })
-    showToast("Link Button added!")
+    }
+    if replaceIndex then
+      tempWindow.elements[replaceIndex] = newElem
+      showToast("Element type changed!")
+      if #historyStack > 1 then
+        table.remove(historyStack)
+      end
+    else
+      table.insert(tempWindow.elements, newElem)
+      showToast("Link Button added!")
+    end
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
       prev.func()
@@ -2244,7 +2472,7 @@ renderAddLinkButton = function(project, tempWindow)
   dlg.show()
 end
 
-renderAddComboBox = function(project, tempWindow)
+renderAddComboBox = function(project, tempWindow, replaceIndex)
   local layout = {
     LinearLayout,
     orientation = "vertical",
@@ -2325,12 +2553,21 @@ renderAddComboBox = function(project, tempWindow)
   btn_confirm.setOnClickListener(function()
     local labelText = edt_label.getText().toString()
     local optionsText = edt_options.getText().toString()
-    table.insert(tempWindow.elements, {
+    local newElem = {
       type = "combobox",
       label = labelText,
       options = optionsText
-    })
-    showToast("ComboBox added!")
+    }
+    if replaceIndex then
+      tempWindow.elements[replaceIndex] = newElem
+      showToast("Element type changed!")
+      if #historyStack > 1 then
+        table.remove(historyStack)
+      end
+    else
+      table.insert(tempWindow.elements, newElem)
+      showToast("ComboBox added!")
+    end
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
       prev.func()
@@ -2359,7 +2596,7 @@ renderAddComboBox = function(project, tempWindow)
   dlg.show()
 end
 
-renderAddToggleButton = function(project, tempWindow)
+renderAddToggleButton = function(project, tempWindow, replaceIndex)
   local layout = {
     LinearLayout,
     orientation = "vertical",
@@ -2428,11 +2665,20 @@ renderAddToggleButton = function(project, tempWindow)
 
   btn_confirm.setOnClickListener(function()
     local optionsText = edt_options.getText().toString()
-    table.insert(tempWindow.elements, {
+    local newElem = {
       type = "togglebutton",
       options = optionsText
-    })
-    showToast("Toggle Button added!")
+    }
+    if replaceIndex then
+      tempWindow.elements[replaceIndex] = newElem
+      showToast("Element type changed!")
+      if #historyStack > 1 then
+        table.remove(historyStack)
+      end
+    else
+      table.insert(tempWindow.elements, newElem)
+      showToast("Toggle Button added!")
+    end
     if #historyStack > 0 then
       local prev = table.remove(historyStack)
       prev.func()
@@ -2474,7 +2720,7 @@ renderEditElement = function(project, tempWindow, elemIndex)
   if elem.type == "edittext" then
     valLabel = "Input Hint: (Optional)"
   elseif elem.type == "checkbox" then
-    valLabel = "CheckBox Label: (Required)"
+    valLabel = "CheckBox Label: (Optional)"
   elseif elem.type == "textview" then
     valLabel = "Display Text: (Required)"
   elseif elem.type == "slider" then
@@ -2586,13 +2832,14 @@ renderEditElement = function(project, tempWindow, elemIndex)
     edit_elem_container.addView(edt_options)
   end
 
+  local btn_update = nil
   if not isTitle then
-    local btn_update = Button(service)
+    btn_update = Button(service)
     btn_update.setText("Update Element")
     btn_update.setOnClickListener(function()
       if edt_val then
         local valStr = edt_val.getText().toString()
-        if valStr == "" and elem.type ~= "slider" and elem.type ~= "edittext" and elem.type ~= "combobox" then valStr = "Element" end
+        if valStr == "" and elem.type ~= "slider" and elem.type ~= "edittext" and elem.type ~= "combobox" and elem.type ~= "checkbox" then valStr = "Element" end
         if elem.type == "button" or elem.type == "clickable" then
           elem.label = valStr
           local targetStr = edt_target and edt_target.getText().toString() or ""
@@ -2628,10 +2875,20 @@ renderEditElement = function(project, tempWindow, elemIndex)
       end
     end)
     edit_elem_container.addView(btn_update)
+  end
 
+  local btn_change_type = Button(service)
+  btn_change_type.setText("Change Element Type")
+  btn_change_type.setOnClickListener(function()
+    table.insert(historyStack, {func = function() renderEditElement(project, tempWindow, elemIndex) end})
+    renderChangeElementTypeMenu(project, tempWindow, elemIndex)
+  end)
+  edit_elem_container.addView(btn_change_type)
+
+  if not isTitle and btn_update then
     local validateEditElem = function()
       local valStr = edt_val and tostring(edt_val.getText()):match("^%s*(.-)%s*$") or ""
-      if elem.type == "slider" or elem.type == "edittext" then
+      if elem.type == "slider" or elem.type == "edittext" or elem.type == "checkbox" then
         btn_update.setEnabled(true)
       elseif elem.type == "combobox" or elem.type == "togglebutton" then
         local oStr = edt_options and tostring(edt_options.getText()):match("^%s*(.-)%s*$") or ""
